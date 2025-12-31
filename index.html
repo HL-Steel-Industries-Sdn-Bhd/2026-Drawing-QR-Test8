@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawing + Work Entry Demo</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+    * { box-sizing: border-box; margin:0; padding:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
+    .container { background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.2); width:100%; max-width:1000px; padding:30px; }
+    h2 { color:#333; text-align:center; margin-bottom:30px; font-size:28px; font-weight:600; }
+    
+    /* 电脑版布局 - 使用网格布局确保等高 */
+    .drawing-content {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    @media (min-width: 768px) {
+        .drawing-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: stretch; /* 关键：确保网格项等高 */
+        }
+        
+        .drawing-info, .scan-section {
+            display: flex;
+            flex-direction: column;
+            height: 100%; /* 关键：填充父容器高度 */
+        }
+    }
+    
+    /* 图纸信息卡片样式 */
+    .drawing-card { 
+        background:#f8f9fa; 
+        border-radius:8px; 
+        padding:25px; 
+        border-left:4px solid #667eea; 
+        box-shadow:0 5px 15px rgba(0,0,0,0.05);
+        height: 100%; /* 关键：填充父容器高度 */
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* 手机版 - 减少间距 */
+    @media (max-width: 767px) {
+        .drawing-card { 
+            padding:15px; 
+            margin-bottom:15px; 
+        }
+        
+        h2 {
+            margin-bottom:20px;
+            font-size:24px;
+        }
+        
+        .container {
+            padding:20px;
+        }
+    }
+    
+    .drawing-grid { 
+        display:grid; 
+        grid-template-columns: repeat(1, 1fr);
+        gap:15px; 
+        margin-bottom:0; 
+        flex: 1; /* 关键：填充可用空间 */
+    }
+    
+    @media (min-width: 768px) {
+        .drawing-grid { 
+            grid-template-columns: repeat(2, 1fr); 
+        }
+    }
+    
+    .info-item { 
+        display:flex; 
+        flex-direction:column; 
+        padding:12px;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #eee;
+        transition: all 0.3s;
+    }
+    
+    .info-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102,126,234,0.1);
+    }
+    
+    .info-label { 
+        font-weight:500; 
+        color:#555; 
+        margin-bottom:4px; 
+        font-size:13px; 
+    }
+    
+    .info-value { 
+        font-size:15px; 
+        color:#333;
+        font-weight: 500;
+    }
+    
+    /* 扫描区域样式 - 统一使用蓝色边框 */
+    .scan-section {
+        background:#f8f9fa; 
+        border-radius:8px; 
+        padding:25px; 
+        text-align:center;
+        border-left:4px solid #667eea; /* 改为蓝色边框 */
+        display: flex;
+        flex-direction: column;
+        height: 100%; /* 关键：填充父容器高度 */
+    }
+    
+    .scan-instruction { 
+        font-size:18px; 
+        color:#667eea; 
+        font-weight:600; 
+        margin-bottom: 20px;
+    }
+    
+    .scanner-container {
+        width: 100%;
+        height: 200px;
+        border: 2px dashed #bbb;
+        border-radius: 8px;
+        position: relative;
+        background-color: #f9f9f9;
+        transition: all 0.3s ease;
+        overflow: hidden;
+        margin: 0 auto 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0; /* 防止容器被压缩 */
+    }
+    
+    /* 电脑上的扫描区域 - 正方形并缩小20% */
+    @media (min-width: 768px) {
+        .scanner-container {
+            width: 180px; /* 正方形，缩小20% */
+            height: 180px;
+            margin: 0 auto 20px;
+        }
+    }
+    
+    /* 手机上的扫描区域 - 确保可见 */
+    @media (max-width: 767px) {
+        .scanner-container {
+            height: 250px; /* 恢复原来的高度 */
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        
+        .scan-section {
+            padding:15px;
+            margin-top: 15px;
+        }
+    }
+    
+    /* 虚线框框提示 */
+    .dashed-box {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #777;
+        font-size: 14px;
+    }
+    
+    .dashed-box i {
+        font-size: 40px;
+        margin-bottom: 10px;
+        color: #667eea;
+    }
+    
+    #reader {
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* GIF容器 */
+    .gif-container {
+        text-align: center;
+        margin-top: auto; /* 关键：推到容器底部 */
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    
+    .gif-container p {
+        margin-bottom: 10px;
+        color:#555;
+        font-size: 14px;
+    }
+    
+    .gif-container img {
+        width: 130px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 工作资料部分 */
+    .work-card {
+        background:#f8f9fa; 
+        border-radius:8px; 
+        padding:25px; 
+        text-align:center;
+        border-left:4px solid #667eea; /* 统一使用蓝色边框 */
+        margin-top: 20px;
+    }
+    
+    #userDisplay {
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 25px;
+        font-size: 1.2rem;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(102,126,234,0.3);
+        font-weight: 600;
+    }
+    
+    .work-content {
+        padding: 30px;
+        color: #666;
+        font-size: 1.1rem;
+        background-color: white;
+        border-radius: 6px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    }
+    
+    /* 隐藏的扫码输入框 */
+    #scannerInput {
+        opacity: 0;
+        position: absolute;
+        left: -9999px;
+    }
+    
+    /* 按钮样式 - 与您提供的示例一致 */
+    .button-container { 
+        display:flex; 
+        justify-content:center; 
+        gap:15px; 
+        margin-top:30px; 
+    }
+    
+    button { 
+        padding:14px 30px; 
+        border:none; 
+        border-radius:6px; 
+        font-size:16px; 
+        font-weight:600; 
+        cursor:pointer; 
+        transition:all 0.3s; 
+    }
+    
+    .submit-btn { 
+        background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); 
+        color:white; 
+        min-width:200px; 
+    }
+    
+    .submit-btn:hover { 
+        transform:translateY(-2px); 
+        box-shadow:0 5px 15px rgba(102,126,234,0.4); 
+    }
+    
+    .submit-btn:active { 
+        transform:translateY(0); 
+    }
+    
+    .reset-btn { 
+        background:#f8f9fa; 
+        color:#666; 
+        border:1px solid #ddd; 
+    }
+    
+    .reset-btn:hover { 
+        background:#e9ecef; 
+    }
+    
+    /* 响应式调整 */
+    @media (max-width: 600px) {
+        .container { padding:15px; }
+        h2 { font-size:22px; margin-bottom:15px; }
+        .drawing-card, .scan-section, .work-card { padding:15px; }
+        .button-container { flex-direction:column; margin-top:20px; }
+        .submit-btn, .reset-btn { width:100%; padding:12px 20px; }
+        
+        /* 进一步减少手机版间距 */
+        .drawing-grid {
+            gap:10px;
+        }
+        
+        .info-item {
+            padding:10px;
+        }
+        
+        .info-label {
+            font-size:12px;
+        }
+        
+        .info-value {
+            font-size:14px;
+        }
+        
+        .scan-instruction {
+            font-size:16px;
+            margin-bottom:15px;
+        }
+    }
+    
+    .section {
+        display: none;
+    }
+    
+    #drawingSection {
+        display: block;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- ===== 隐藏 input 用于电脑 scanner ===== -->
+  <input type="text" id="scannerInput" autofocus>
+
+  <!-- ===== 阶段 1：图纸信息 ===== -->
+  <div id="drawingSection" class="section" style="display:block;">
+    <h2>📋 Drawing Information</h2>
+    
+    <div class="drawing-content">
+        <div class="drawing-info">
+            <div class="drawing-card">
+                <div class="drawing-grid">
+                    <div class="info-item">
+                        <div class="info-label">Sales Order No.</div>
+                        <div class="info-value">SO-009999</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Item No.</div>
+                        <div class="info-value">20</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Customer Name</div>
+                        <div class="info-value">Fujimak</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Item Name</div>
+                        <div class="info-value">S/S Table</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Dimension</div>
+                        <div class="info-value">L 870mm x W 760mm x H 50mm</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Quantity</div>
+                        <div class="info-value">1</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Unit of Measurement</div>
+                        <div class="info-value">Set</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Estimated Delivery Date</div>
+                        <div class="info-value">15/01/2025</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="scan-section">
+            <div class="scan-instruction">Please scan your <b>Credential QR Code</b></div>
+            
+            <div class="scanner-container" id="scannerContainer">
+                <div class="dashed-box" id="dashedBox">
+                    <div style="font-size: 24px;">📱</div>
+                    <div>QR Code Scanner Area</div>
+                    <div style="font-size: 12px; margin-top: 5px;">虚线框框 - 手机扫码区域</div>
+                </div>
+                <div id="reader"></div>
+            </div>
+
+            <div class="gif-container" id="gifContainer">
+                <p>Use your scanner to scan the Credential QR Code</p>
+                <img src="https://media.giphy.com/media/3o6ZtaO9BZHcOjmErm/giphy.gif" alt="Scanner GIF">
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- ===== 阶段 2：填工作资料 ===== -->
+  <div id="workSection" class="section">
+    <h2>📝 Work Entry Page</h2>
+    
+    <div class="work-card">
+        <p id="userDisplay"></p>
+        
+        <div class="work-content">
+            <p>Here you can fill the work data for this drawing.</p>
+            <p style="margin-top: 15px; font-size: 16px; color: #555;">Work entry form will appear here after scanning your credential.</p>
+        </div>
+        
+        <div class="button-container">
+            <button type="button" class="reset-btn" onclick="resetToDrawing()">Back to Drawing</button>
+            <button type="button" class="submit-btn" onclick="showWorkForm()">Enter Work Data</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function isMobile() {
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+const scannerContainer = document.getElementById("scannerContainer");
+const dashedBox = document.getElementById("dashedBox");
+const gifContainer = document.getElementById("gifContainer");
+const drawingSection = document.getElementById("drawingSection");
+const workSection = document.getElementById("workSection");
+const userDisplay = document.getElementById("userDisplay");
+const scannerInput = document.getElementById("scannerInput");
+
+function handleCredentialScan(user) {
+  // 隐藏图纸信息，显示填工作资料
+  drawingSection.style.display = "none";
+  workSection.style.display = "block";
+  userDisplay.textContent = `Current User: ${user}`;
+}
+
+function resetToDrawing() {
+  workSection.style.display = "none";
+  drawingSection.style.display = "block";
+}
+
+function showWorkForm() {
+  alert("Work data form would open here in a real application.");
+}
+
+if (isMobile()) {
+  // 手机打开，显示摄像头扫码
+  scannerContainer.style.display = "block";
+  dashedBox.style.display = "none";
+  gifContainer.style.display = "none";
+  
+  const html5QrcodeScanner = new Html5Qrcode("reader");
+
+  html5QrcodeScanner.start(
+    { facingMode: "environment" },
+    { 
+      fps: 10, 
+      qrbox: { width: 250, height: 250 } // 恢复原来的focus框大小
+    },
+    (decodedText) => {
+      console.log("Scanned:", decodedText);
+      if(decodedText === "Cyril") {
+        html5QrcodeScanner.stop();
+        handleCredentialScan("Cyril");
+      } else {
+        alert("Unknown user QR. Please scan a valid credential.");
+      }
+    }
+  ).catch(err => {
+    console.error(err);
+    alert("Camera initialization failed. Please check camera permissions.");
+  });
+
+} else {
+  // 电脑打开，显示虚线框框和GIF提示
+  scannerContainer.style.display = "block";
+  dashedBox.style.display = "flex";
+  gifContainer.style.display = "block";
+
+  // 每次点击页面都 focus 隐藏输入框，保证 scanner 输入能捕获
+  document.addEventListener("click", () => scannerInput.focus());
+
+  // 监听 scanner 输入
+  scannerInput.addEventListener("keydown", (e) => {
+    if(e.key === "Enter") {
+      const value = scannerInput.value.trim();
+      scannerInput.value = "";
+      if(value === "Cyril") {
+        handleCredentialScan("Cyril");
+      } else {
+        alert("Unknown user. Please scan a valid credential QR code.");
+      }
+    }
+  });
+
+  // 页面加载后自动 focus 输入框
+  window.onload = () => {
+    scannerInput.focus();
+  };
+}
+</script>
+</body>
+</html>
